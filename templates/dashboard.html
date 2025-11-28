@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - DB Backup Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl font-bold text-primary">{{ stats.total_databases }}</div>
+            <div class="text-gray-500">总数据库</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl font-bold text-green-500">{{ stats.enabled_databases }}</div>
+            <div class="text-gray-500">已启用</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl font-bold text-blue-500">{{ stats.total_backups }}</div>
+            <div class="text-gray-500">总备份数</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl font-bold text-green-500">{{ stats.successful_backups }}</div>
+            <div class="text-gray-500">成功</div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl font-bold text-red-500">{{ stats.failed_backups }}</div>
+            <div class="text-gray-500">失败</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Databases -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold">数据库</h2>
+                <a href="{{ url_for('databases') }}" class="text-primary text-sm hover:underline">管理 →</a>
+            </div>
+            <div class="p-4">
+                {% if databases %}
+                <div class="space-y-3">
+                    {% for db in databases[:5] %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl">
+                                {% if db.db_type == 'mysql' %}🐬{% elif db.db_type == 'postgresql' %}🐘{% else %}📁{% endif %}
+                            </span>
+                            <div>
+                                <div class="font-medium">{{ db.name }}</div>
+                                <div class="text-sm text-gray-500">{{ db.db_type }} · {{ db.host }}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 rounded text-xs {% if db.enabled %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                                {{ '启用' if db.enabled else '禁用' }}
+                            </span>
+                            <button onclick="triggerBackup({{ db.id }})" 
+                                class="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-blue-600">
+                                备份
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-center py-8">暂无数据库配置</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Backups -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold">最近备份</h2>
+                <a href="{{ url_for('backups') }}" class="text-primary text-sm hover:underline">查看全部 →</a>
+            </div>
+            <div class="p-4">
+                {% if recent_backups %}
+                <div class="space-y-2">
+                    {% for backup in recent_backups %}
+                    <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <div class="flex items-center space-x-3">
+                            <span class="{% if backup.status == 'success' %}text-green-500{% elif backup.status == 'failed' %}text-red-500{% else %}text-yellow-500{% endif %}">
+                                {% if backup.status == 'success' %}✓{% elif backup.status == 'failed' %}✗{% else %}⏳{% endif %}
+                            </span>
+                            <div>
+                                <div class="text-sm font-medium">{{ backup.database.name }}</div>
+                                <div class="text-xs text-gray-500">{{ backup.created_at.strftime('%m-%d %H:%M') }} · {{ backup.file_size_str }}</div>
+                            </div>
+                        </div>
+                        {% if backup.tg_uploaded %}
+                        <span class="text-blue-500" title="已上传到Telegram">📤</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-center py-8">暂无备份记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Jobs -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold">定时任务</h2>
+        </div>
+        <div class="p-4">
+            {% if scheduled_jobs %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b">
+                            <th class="pb-2">任务名称</th>
+                            <th class="pb-2">下次执行</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in scheduled_jobs %}
+                        <tr class="border-b border-gray-100">
+                            <td class="py-2">{{ job.name }}</td>
+                            <td class="py-2 text-gray-600">{{ job.next_run or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-4">暂无定时任务</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function triggerBackup(dbId) {
+    if (!confirm('确定要立即执行备份？')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '备份中...';
+    
+    try {
+        const result = await api(`/api/backup/${dbId}`, 'POST');
+        if (result.status === 'success') {
+            showToast('备份成功！');
+        } else {
+            showToast('备份失败: ' + result.error_message, 'error');
+        }
+    } catch (e) {
+        showToast('请求失败', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '备份';
+        setTimeout(() => location.reload(), 1000);
+    }
+}
+</script>
+{% endblock %}

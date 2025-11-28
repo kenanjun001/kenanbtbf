@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}系统日志 - DB Backup Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">系统日志</h1>
+        <div class="flex space-x-2">
+            <a href="{{ url_for('logs') }}" 
+               class="px-3 py-1 rounded {% if not current_level %}bg-primary text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                全部
+            </a>
+            <a href="{{ url_for('logs', level='info') }}" 
+               class="px-3 py-1 rounded {% if current_level == 'info' %}bg-blue-500 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                信息
+            </a>
+            <a href="{{ url_for('logs', level='warning') }}" 
+               class="px-3 py-1 rounded {% if current_level == 'warning' %}bg-yellow-500 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                警告
+            </a>
+            <a href="{{ url_for('logs', level='error') }}" 
+               class="px-3 py-1 rounded {% if current_level == 'error' %}bg-red-500 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                错误
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if logs.items %}
+        <div class="divide-y divide-gray-100">
+            {% for log in logs.items %}
+            <div class="px-6 py-3 hover:bg-gray-50">
+                <div class="flex items-start space-x-3">
+                    <span class="mt-1 flex-shrink-0">
+                        {% if log.level == 'error' %}
+                        <span class="w-2 h-2 bg-red-500 rounded-full inline-block"></span>
+                        {% elif log.level == 'warning' %}
+                        <span class="w-2 h-2 bg-yellow-500 rounded-full inline-block"></span>
+                        {% else %}
+                        <span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span>
+                        {% endif %}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between">
+                            <p class="text-gray-900">{{ log.message }}</p>
+                            <span class="text-xs text-gray-500 flex-shrink-0 ml-4">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                        </div>
+                        {% if log.details %}
+                        <p class="text-sm text-gray-500 mt-1 truncate">{{ log.details }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if logs.pages > 1 %}
+        <div class="px-6 py-4 border-t flex justify-center space-x-2">
+            {% if logs.has_prev %}
+            <a href="?page={{ logs.prev_num }}{% if current_level %}&level={{ current_level }}{% endif %}" 
+               class="px-3 py-1 border rounded hover:bg-gray-50">上一页</a>
+            {% endif %}
+            
+            <span class="px-3 py-1">{{ logs.page }} / {{ logs.pages }}</span>
+            
+            {% if logs.has_next %}
+            <a href="?page={{ logs.next_num }}{% if current_level %}&level={{ current_level }}{% endif %}" 
+               class="px-3 py-1 border rounded hover:bg-gray-50">下一页</a>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="p-12 text-center text-gray-500">
+            暂无日志记录
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+# Web框架
+Flask==3.0.0
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.1.1
+Werkzeug==3.0.1
+
+# 数据库
+SQLAlchemy==2.0.23
+
+# Telegram
+python-telegram-bot==20.7
+
+# 定时任务
+APScheduler==3.10.4
+
+# 加密
+cryptography==41.0.7
+
+# HTTP请求
+requests==2.31.0
+urllib3==2.1.0
+
+# 数据库驱动（可选，按需安装）
+# mysqlclient==2.2.0
+# psycopg2-binary==2.9.9
+
+# 生产服务器（可选）
+# gunicorn==21.2.0
+# waitress==2.1.2

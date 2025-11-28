@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DB Backup Bot{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [data-theme="dark"] { color-scheme: dark; }
+        .dark { background-color: #1a1a2e; color: #eee; }
+        .dark .bg-white { background-color: #16213e !important; }
+        .dark .bg-gray-50 { background-color: #1a1a2e !important; }
+        .dark .bg-gray-100 { background-color: #0f3460 !important; }
+        .dark .text-gray-900 { color: #eee !important; }
+        .dark .text-gray-700 { color: #ccc !important; }
+        .dark .text-gray-600 { color: #aaa !important; }
+        .dark .text-gray-500 { color: #999 !important; }
+        .dark .border-gray-200 { border-color: #333 !important; }
+        .dark .border-gray-300 { border-color: #444 !important; }
+        .dark input, .dark select, .dark textarea { 
+            background-color: #0f3460 !important; 
+            color: #eee !important;
+            border-color: #333 !important;
+        }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% if current_user.is_authenticated %}
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <a href="{{ url_for('dashboard') }}" class="text-xl font-bold text-primary">🗄️ DB Backup</a>
+                    <a href="{{ url_for('dashboard') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'dashboard' %}text-primary font-medium{% endif %}">仪表盘</a>
+                    <a href="{{ url_for('databases') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'databases' %}text-primary font-medium{% endif %}">数据库</a>
+                    <a href="{{ url_for('bt_panels') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'bt_panels' %}text-primary font-medium{% endif %}">宝塔面板</a>
+                    <a href="{{ url_for('backups') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'backups' %}text-primary font-medium{% endif %}">备份历史</a>
+                    <a href="{{ url_for('logs') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'logs' %}text-primary font-medium{% endif %}">日志</a>
+                    <a href="{{ url_for('settings') }}" class="text-gray-600 hover:text-primary {% if request.endpoint == 'settings' %}text-primary font-medium{% endif %}">设置</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="toggleTheme()" class="p-2 rounded hover:bg-gray-100" title="切换主题">🌓</button>
+                    <span class="text-gray-600">{{ current_user.username }}</span>
+                    <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-700">退出</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="max-w-7xl mx-auto py-6 px-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="mb-4 p-4 rounded {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            document.body.classList.toggle('dark');
+            localStorage.setItem('theme', next);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.body.classList.add('dark');
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded shadow-lg z-50 ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // API helper
+        async function api(url, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data) options.body = JSON.stringify(data);
+            const response = await fetch(url, options);
+            return response.json();
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

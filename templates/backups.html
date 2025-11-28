@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}备份历史 - DB Backup Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold">备份历史</h1>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if backups.items %}
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr class="text-left text-gray-600 text-sm">
+                    <th class="px-6 py-3">状态</th>
+                    <th class="px-6 py-3">数据库</th>
+                    <th class="px-6 py-3">文件名</th>
+                    <th class="px-6 py-3">大小</th>
+                    <th class="px-6 py-3">耗时</th>
+                    <th class="px-6 py-3">TG</th>
+                    <th class="px-6 py-3">时间</th>
+                    <th class="px-6 py-3">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for backup in backups.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        {% if backup.status == 'success' %}
+                        <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">成功</span>
+                        {% elif backup.status == 'failed' %}
+                        <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs" title="{{ backup.error_message }}">失败</span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">进行中</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 font-medium">{{ backup.database.name if backup.database else '-' }}</td>
+                    <td class="px-6 py-4 text-gray-600 text-sm">{{ backup.filename }}</td>
+                    <td class="px-6 py-4 text-gray-600">{{ backup.file_size_str }}</td>
+                    <td class="px-6 py-4 text-gray-600">{{ '%.1f' % backup.duration if backup.duration else '-' }}s</td>
+                    <td class="px-6 py-4">
+                        {% if backup.tg_uploaded %}
+                        <span class="text-green-500">✓</span>
+                        {% else %}
+                        <span class="text-gray-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-gray-600 text-sm">{{ backup.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            {% if backup.status == 'success' %}
+                            <a href="/api/backup/{{ backup.id }}/download" class="text-primary hover:underline text-sm">下载</a>
+                            {% if not backup.tg_uploaded %}
+                            <button onclick="uploadToTg({{ backup.id }})" class="text-blue-500 hover:underline text-sm">上传TG</button>
+                            {% endif %}
+                            <button onclick="restoreBackup({{ backup.id }})" class="text-yellow-600 hover:underline text-sm">恢复</button>
+                            {% endif %}
+                            <button onclick="deleteBackup({{ backup.id }})" class="text-red-500 hover:underline text-sm">删除</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if backups.pages > 1 %}
+        <div class="px-6 py-4 border-t flex justify-center space-x-2">
+            {% if backups.has_prev %}
+            <a href="?page={{ backups.prev_num }}" class="px-3 py-1 border rounded hover:bg-gray-50">上一页</a>
+            {% endif %}
+            
+            <span class="px-3 py-1">{{ backups.page }} / {{ backups.pages }}</span>
+            
+            {% if backups.has_next %}
+            <a href="?page={{ backups.next_num }}" class="px-3 py-1 border rounded hover:bg-gray-50">下一页</a>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="p-12 text-center text-gray-500">
+            暂无备份记录
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function uploadToTg(id) {
+    showToast('正在上传到Telegram...');
+    const result = await api(`/api/backup/${id}/upload-tg`, 'POST');
+    
+    if (result.success) {
+        showToast('上传成功');
+        location.reload();
+    } else {
+        showToast('上传失败', 'error');
+    }
+}
+
+async function restoreBackup(id) {
+    if (!confirm('⚠️ 警告：恢复操作将覆盖现有数据库内容！\n\n确定要执行恢复吗？')) return;
+    if (!confirm('再次确认：此操作不可逆，确定继续？')) return;
+    
+    showToast('正在恢复...');
+    const result = await api(`/api/backup/${id}/restore`, 'POST');
+    
+    if (result.success) {
+        showToast('恢复成功');
+    } else {
+        showToast('恢复失败', 'error');
+    }
+}
+
+async function deleteBackup(id) {
+    if (!confirm('确定要删除这个备份？')) return;
+    
+    await api(`/api/backup/${id}`, 'DELETE');
+    showToast('删除成功');
+    location.reload();
+}
+</script>
+{% endblock %}

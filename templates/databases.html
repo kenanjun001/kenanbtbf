@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}数据库管理 - DB Backup Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">数据库管理</h1>
+        <button onclick="openModal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+            + 添加数据库
+        </button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if databases %}
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr class="text-left text-gray-600 text-sm">
+                    <th class="px-6 py-3">名称</th>
+                    <th class="px-6 py-3">类型</th>
+                    <th class="px-6 py-3">主机</th>
+                    <th class="px-6 py-3">数据库</th>
+                    <th class="px-6 py-3">定时备份</th>
+                    <th class="px-6 py-3">状态</th>
+                    <th class="px-6 py-3">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for db in databases %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">{{ db.name }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 bg-gray-100 rounded text-sm">{{ db.db_type }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-gray-600">{{ db.host }}:{{ db.port or '-' }}</td>
+                    <td class="px-6 py-4 text-gray-600">{{ db.database }}</td>
+                    <td class="px-6 py-4">
+                        {% if db.schedule_enabled %}
+                        <span class="text-green-600">{{ db.schedule_type }} @ {{ db.schedule_time }}</span>
+                        {% else %}
+                        <span class="text-gray-400">未启用</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded text-xs {% if db.enabled %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ '启用' if db.enabled else '禁用' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            <button onclick="triggerBackup({{ db.id }})" class="text-primary hover:underline text-sm">备份</button>
+                            <button onclick="editDb({{ db.id }})" class="text-gray-600 hover:underline text-sm">编辑</button>
+                            <button onclick="deleteDb({{ db.id }})" class="text-red-500 hover:underline text-sm">删除</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-12 text-center text-gray-500">
+            <p class="text-lg mb-4">暂无数据库配置</p>
+            <button onclick="openModal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                添加第一个数据库
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="dbModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold" id="modalTitle">添加数据库</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <form id="dbForm" class="p-4 space-y-4">
+            <input type="hidden" id="dbId">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">名称</label>
+                    <input type="text" id="dbName" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+                    <select id="dbType" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                        <option value="mysql">MySQL</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="sqlite">SQLite</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                    <select id="dbEnabled"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                        <option value="true">启用</option>
+                        <option value="false">禁用</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">主机</label>
+                    <input type="text" id="dbHost" value="localhost"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">端口</label>
+                    <input type="number" id="dbPort" placeholder="自动"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">数据库名/路径</label>
+                    <input type="text" id="dbDatabase" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                    <input type="text" id="dbUsername"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                    <input type="password" id="dbPassword"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <div class="space-y-4">
+                <div class="flex items-center">
+                    <input type="checkbox" id="scheduleEnabled" class="mr-2">
+                    <label class="text-sm font-medium text-gray-700">启用定时备份</label>
+                </div>
+                
+                <div id="scheduleOptions" class="grid grid-cols-2 gap-4 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">频率</label>
+                        <select id="scheduleType"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                            <option value="hourly">每小时</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每周</option>
+                            <option value="custom">自定义Cron</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">时间</label>
+                        <input type="time" id="scheduleTime" value="03:00"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                    
+                    <div id="weeklyDay" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">星期</label>
+                        <select id="scheduleDay"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                            <option value="0">周一</option>
+                            <option value="1">周二</option>
+                            <option value="2">周三</option>
+                            <option value="3">周四</option>
+                            <option value="4">周五</option>
+                            <option value="5">周六</option>
+                            <option value="6">周日</option>
+                        </select>
+                    </div>
+                    
+                    <div id="customCron" class="col-span-2 hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cron表达式</label>
+                        <input type="text" id="scheduleCron" placeholder="0 3 * * *"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    取消
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                    保存
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const modal = document.getElementById('dbModal');
+const form = document.getElementById('dbForm');
+
+document.getElementById('scheduleEnabled').addEventListener('change', function() {
+    document.getElementById('scheduleOptions').classList.toggle('hidden', !this.checked);
+});
+
+document.getElementById('scheduleType').addEventListener('change', function() {
+    document.getElementById('weeklyDay').classList.toggle('hidden', this.value !== 'weekly');
+    document.getElementById('customCron').classList.toggle('hidden', this.value !== 'custom');
+});
+
+function openModal(data = null) {
+    if (data) {
+        document.getElementById('modalTitle').textContent = '编辑数据库';
+        document.getElementById('dbId').value = data.id;
+        document.getElementById('dbName').value = data.name;
+        document.getElementById('dbType').value = data.db_type;
+        document.getElementById('dbHost').value = data.host;
+        document.getElementById('dbPort').value = data.port || '';
+        document.getElementById('dbDatabase').value = data.database;
+        document.getElementById('dbUsername').value = data.username || '';
+        document.getElementById('dbEnabled').value = data.enabled ? 'true' : 'false';
+        document.getElementById('scheduleEnabled').checked = data.schedule_enabled;
+        document.getElementById('scheduleType').value = data.schedule_type;
+        document.getElementById('scheduleTime').value = data.schedule_time;
+        document.getElementById('scheduleDay').value = data.schedule_day;
+        document.getElementById('scheduleCron').value = data.schedule_cron || '';
+        
+        document.getElementById('scheduleOptions').classList.toggle('hidden', !data.schedule_enabled);
+        document.getElementById('weeklyDay').classList.toggle('hidden', data.schedule_type !== 'weekly');
+        document.getElementById('customCron').classList.toggle('hidden', data.schedule_type !== 'custom');
+    } else {
+        document.getElementById('modalTitle').textContent = '添加数据库';
+        form.reset();
+        document.getElementById('dbId').value = '';
+        document.getElementById('dbHost').value = 'localhost';
+        document.getElementById('scheduleTime').value = '03:00';
+        document.getElementById('scheduleOptions').classList.add('hidden');
+    }
+    modal.classList.add('active');
+}
+
+function closeModal() {
+    modal.classList.remove('active');
+}
+
+async function editDb(id) {
+    const data = await api(`/api/databases/${id}`);
+    openModal(data);
+}
+
+async function deleteDb(id) {
+    if (!confirm('确定要删除这个数据库配置？相关备份记录也会被删除。')) return;
+    
+    await api(`/api/databases/${id}`, 'DELETE');
+    showToast('删除成功');
+    location.reload();
+}
+
+async function triggerBackup(dbId) {
+    if (!confirm('确定要立即执行备份？')) return;
+    
+    showToast('备份已开始...');
+    const result = await api(`/api/backup/${dbId}`, 'POST');
+    
+    if (result.status === 'success') {
+        showToast('备份成功！');
+    } else {
+        showToast('备份失败: ' + result.error_message, 'error');
+    }
+}
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        name: document.getElementById('dbName').value,
+        db_type: document.getElementById('dbType').value,
+        host: document.getElementById('dbHost').value,
+        port: document.getElementById('dbPort').value ? parseInt(document.getElementById('dbPort').value) : null,
+        database: document.getElementById('dbDatabase').value,
+        username: document.getElementById('dbUsername').value,
+        password: document.getElementById('dbPassword').value,
+        enabled: document.getElementById('dbEnabled').value === 'true',
+        schedule_enabled: document.getElementById('scheduleEnabled').checked,
+        schedule_type: document.getElementById('scheduleType').value,
+        schedule_time: document.getElementById('scheduleTime').value,
+        schedule_day: parseInt(document.getElementById('scheduleDay').value),
+        schedule_cron: document.getElementById('scheduleCron').value
+    };
+    
+    const id = document.getElementById('dbId').value;
+    
+    if (id) {
+        await api(`/api/databases/${id}`, 'PUT', data);
+        showToast('更新成功');
+    } else {
+        await api('/api/databases', 'POST', data);
+        showToast('添加成功');
+    }
+    
+    closeModal();
+    location.reload();
+});
+</script>
+{% endblock %}

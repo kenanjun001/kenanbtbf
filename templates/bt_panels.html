@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block title %}宝塔面板 - DB Backup Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">宝塔面板管理</h1>
+        <button onclick="openPanelModal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+            + 添加面板
+        </button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if panels %}
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr class="text-left text-gray-600 text-sm">
+                    <th class="px-6 py-3">名称</th>
+                    <th class="px-6 py-3">面板地址</th>
+                    <th class="px-6 py-3">状态</th>
+                    <th class="px-6 py-3">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for panel in panels %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">{{ panel.name }}</td>
+                    <td class="px-6 py-4 text-gray-600">{{ panel.url }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded text-xs {% if panel.enabled %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ '启用' if panel.enabled else '禁用' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            <button onclick="testPanel({{ panel.id }})" class="text-blue-500 hover:underline text-sm">测试</button>
+                            <button onclick="showDatabases({{ panel.id }}, '{{ panel.name }}')" class="text-green-600 hover:underline text-sm">数据库</button>
+                            <button onclick="editPanel({{ panel.id }})" class="text-gray-600 hover:underline text-sm">编辑</button>
+                            <button onclick="deletePanel({{ panel.id }})" class="text-red-500 hover:underline text-sm">删除</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-12 text-center text-gray-500">
+            <p class="text-lg mb-4">暂无宝塔面板配置</p>
+            <p class="text-sm mb-4">添加宝塔面板后，可以直接调用服务器上的备份功能</p>
+            <button onclick="openPanelModal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                添加宝塔面板
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 使用说明 -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">📖 如何获取宝塔 API 密钥</h3>
+        <ol class="list-decimal list-inside space-y-2 text-gray-600">
+            <li>登录宝塔面板</li>
+            <li>点击左侧菜单「设置」</li>
+            <li>找到「API接口」选项</li>
+            <li>开启 API 接口</li>
+            <li>添加 IP 白名单（添加你当前电脑的公网 IP）</li>
+            <li>复制 API 密钥</li>
+        </ol>
+        <p class="mt-4 text-sm text-yellow-600">⚠️ 注意：需要将你的公网 IP 添加到白名单才能调用 API</p>
+    </div>
+</div>
+
+<!-- 面板配置弹窗 -->
+<div id="panelModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold" id="panelModalTitle">添加宝塔面板</h3>
+            <button onclick="closePanelModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <form id="panelForm" class="p-4 space-y-4">
+            <input type="hidden" id="panelId">
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">名称</label>
+                <input type="text" id="panelName" required placeholder="例如：主服务器"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">面板地址</label>
+                <input type="text" id="panelUrl" required placeholder="http://IP:端口"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                <p class="text-xs text-gray-500 mt-1">例如：http://104.250.137.18:8888</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">API 密钥</label>
+                <input type="password" id="panelApiKey" placeholder="留空表示不修改"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                <select id="panelEnabled"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    <option value="true">启用</option>
+                    <option value="false">禁用</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closePanelModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    取消
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                    保存
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 数据库列表弹窗 -->
+<div id="dbListModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold"><span id="dbListPanelName"></span> - 数据库列表</h3>
+            <button onclick="closeDbListModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1" id="dbListContent">
+            <div class="text-center text-gray-500 py-8">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- 定时备份设置弹窗 -->
+<div id="scheduleModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold">定时备份设置 - <span id="scheduleDbName"></span></h3>
+            <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <form id="scheduleForm" class="p-4 space-y-4">
+            <input type="hidden" id="scheduleConfigId">
+            <input type="hidden" id="schedulePanelId">
+            <input type="hidden" id="scheduleBtDbId">
+            <input type="hidden" id="scheduleDbNameHidden">
+            
+            <div class="flex items-center">
+                <input type="checkbox" id="scheduleEnabled" class="mr-2">
+                <label class="text-sm font-medium text-gray-700">启用定时备份</label>
+            </div>
+            
+            <div id="scheduleOptions" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">备份频率</label>
+                    <select id="scheduleType"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                        <option value="hourly">每小时</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每周</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">备份时间</label>
+                    <input type="time" id="scheduleTime" value="03:00"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <div id="weeklyDayWrapper" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">星期</label>
+                    <select id="scheduleDay"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                        <option value="0">周一</option>
+                        <option value="1">周二</option>
+                        <option value="2">周三</option>
+                        <option value="3">周四</option>
+                        <option value="4">周五</option>
+                        <option value="5">周六</option>
+                        <option value="6">周日</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" id="pushToTg" checked class="mr-2">
+                    <label class="text-sm font-medium text-gray-700">备份完成后推送文件到 Telegram</label>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeScheduleModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    取消
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                    保存
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const panelModal = document.getElementById('panelModal');
+const dbListModal = document.getElementById('dbListModal');
+const scheduleModal = document.getElementById('scheduleModal');
+const panelForm = document.getElementById('panelForm');
+const scheduleForm = document.getElementById('scheduleForm');
+let currentPanelId = null;
+let btDatabaseConfigs = {};  // 缓存已配置的定时备份
+
+function openPanelModal(data = null) {
+    if (data) {
+        document.getElementById('panelModalTitle').textContent = '编辑宝塔面板';
+        document.getElementById('panelId').value = data.id;
+        document.getElementById('panelName').value = data.name;
+        document.getElementById('panelUrl').value = data.url;
+        document.getElementById('panelApiKey').value = '';
+        document.getElementById('panelApiKey').placeholder = '留空表示不修改';
+        document.getElementById('panelEnabled').value = data.enabled ? 'true' : 'false';
+    } else {
+        document.getElementById('panelModalTitle').textContent = '添加宝塔面板';
+        panelForm.reset();
+        document.getElementById('panelId').value = '';
+        document.getElementById('panelApiKey').placeholder = 'API 密钥';
+    }
+    panelModal.classList.add('active');
+}
+
+function closePanelModal() {
+    panelModal.classList.remove('active');
+}
+
+function closeDbListModal() {
+    dbListModal.classList.remove('active');
+}
+
+function closeScheduleModal() {
+    scheduleModal.classList.remove('active');
+}
+
+document.getElementById('scheduleEnabled').addEventListener('change', function() {
+    document.getElementById('scheduleOptions').style.opacity = this.checked ? '1' : '0.5';
+});
+
+document.getElementById('scheduleType').addEventListener('change', function() {
+    document.getElementById('weeklyDayWrapper').classList.toggle('hidden', this.value !== 'weekly');
+});
+
+async function editPanel(id) {
+    const panels = await api('/api/bt-panels');
+    const panel = panels.find(p => p.id === id);
+    if (panel) openPanelModal(panel);
+}
+
+async function deletePanel(id) {
+    if (!confirm('确定要删除这个面板配置？')) return;
+    await api(`/api/bt-panels/${id}`, 'DELETE');
+    showToast('删除成功');
+    location.reload();
+}
+
+async function testPanel(id) {
+    showToast('测试连接中...');
+    const result = await api(`/api/bt-panels/${id}/test`, 'POST');
+    
+    if (result.success) {
+        showToast('连接成功！');
+    } else {
+        showToast('连接失败: ' + (result.error || '未知错误'), 'error');
+    }
+}
+
+async function showDatabases(id, name) {
+    currentPanelId = id;
+    document.getElementById('dbListPanelName').textContent = name;
+    document.getElementById('dbListContent').innerHTML = '<div class="text-center text-gray-500 py-8">加载中...</div>';
+    dbListModal.classList.add('active');
+    
+    // 获取已配置的定时备份
+    const configs = await api('/api/bt-databases');
+    btDatabaseConfigs = {};
+    configs.forEach(c => {
+        if (c.panel_id === id) {
+            btDatabaseConfigs[c.bt_db_id] = c;
+        }
+    });
+    
+    const result = await api(`/api/bt-panels/${id}/databases`);
+    
+    if (result.data && result.data.length > 0) {
+        let html = '<div class="space-y-2">';
+        for (const db of result.data) {
+            const config = btDatabaseConfigs[db.id];
+            const scheduleInfo = config && config.schedule_enabled 
+                ? `<span class="text-green-600 text-xs ml-2">⏰ ${config.schedule_type} @ ${config.schedule_time}</span>`
+                : '';
+            
+            html += `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100">
+                    <div>
+                        <div class="font-medium">${db.name} ${scheduleInfo}</div>
+                        <div class="text-sm text-gray-500">用户: ${db.username}</div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="openSchedule(${db.id}, '${db.name}')" 
+                            class="px-3 py-1 border border-gray-300 text-gray-600 text-sm rounded hover:bg-gray-200">
+                            ⏰ 定时
+                        </button>
+                        <button onclick="backupBtDb(${db.id}, '${db.name}')" 
+                            class="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-blue-600">
+                            备份
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        document.getElementById('dbListContent').innerHTML = html;
+    } else {
+        document.getElementById('dbListContent').innerHTML = 
+            '<div class="text-center text-gray-500 py-8">暂无数据库或获取失败<br><span class="text-sm">请检查 API 密钥和 IP 白名单</span></div>';
+    }
+}
+
+function openSchedule(btDbId, dbName) {
+    document.getElementById('scheduleDbName').textContent = dbName;
+    document.getElementById('schedulePanelId').value = currentPanelId;
+    document.getElementById('scheduleBtDbId').value = btDbId;
+    document.getElementById('scheduleDbNameHidden').value = dbName;
+    
+    const config = btDatabaseConfigs[btDbId];
+    if (config) {
+        document.getElementById('scheduleConfigId').value = config.id;
+        document.getElementById('scheduleEnabled').checked = config.schedule_enabled;
+        document.getElementById('scheduleType').value = config.schedule_type;
+        document.getElementById('scheduleTime').value = config.schedule_time;
+        document.getElementById('scheduleDay').value = config.schedule_day;
+        document.getElementById('pushToTg').checked = config.push_to_tg;
+    } else {
+        document.getElementById('scheduleConfigId').value = '';
+        document.getElementById('scheduleEnabled').checked = false;
+        document.getElementById('scheduleType').value = 'daily';
+        document.getElementById('scheduleTime').value = '03:00';
+        document.getElementById('scheduleDay').value = '0';
+        document.getElementById('pushToTg').checked = true;
+    }
+    
+    document.getElementById('scheduleOptions').style.opacity = document.getElementById('scheduleEnabled').checked ? '1' : '0.5';
+    document.getElementById('weeklyDayWrapper').classList.toggle('hidden', document.getElementById('scheduleType').value !== 'weekly');
+    
+    scheduleModal.classList.add('active');
+}
+
+async function backupBtDb(dbId, dbName) {
+    if (!confirm(`确定要备份数据库 ${dbName}？`)) return;
+    
+    showToast('正在执行备份...');
+    
+    const result = await api(`/api/bt-panels/${currentPanelId}/backup`, 'POST', {
+        db_id: dbId,
+        db_name: dbName,
+        push_to_tg: true
+    });
+    
+    if (result.success) {
+        showToast('备份成功！文件已推送到 Telegram');
+    } else {
+        showToast('备份失败: ' + (result.error || '未知错误'), 'error');
+    }
+}
+
+panelForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        name: document.getElementById('panelName').value,
+        url: document.getElementById('panelUrl').value,
+        api_key: document.getElementById('panelApiKey').value,
+        enabled: document.getElementById('panelEnabled').value === 'true'
+    };
+    
+    const id = document.getElementById('panelId').value;
+    
+    if (id) {
+        await api(`/api/bt-panels/${id}`, 'PUT', data);
+        showToast('更新成功');
+    } else {
+        if (!data.api_key) {
+            showToast('请输入 API 密钥', 'error');
+            return;
+        }
+        await api('/api/bt-panels', 'POST', data);
+        showToast('添加成功');
+    }
+    
+    closePanelModal();
+    location.reload();
+});
+
+scheduleForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        panel_id: parseInt(document.getElementById('schedulePanelId').value),
+        bt_db_id: parseInt(document.getElementById('scheduleBtDbId').value),
+        db_name: document.getElementById('scheduleDbNameHidden').value,
+        schedule_enabled: document.getElementById('scheduleEnabled').checked,
+        schedule_type: document.getElementById('scheduleType').value,
+        schedule_time: document.getElementById('scheduleTime').value,
+        schedule_day: parseInt(document.getElementById('scheduleDay').value),
+        push_to_tg: document.getElementById('pushToTg').checked
+    };
+    
+    const configId = document.getElementById('scheduleConfigId').value;
+    
+    if (configId) {
+        await api(`/api/bt-databases/${configId}`, 'PUT', data);
+    } else {
+        await api('/api/bt-databases', 'POST', data);
+    }
+    
+    showToast('定时备份设置已保存');
+    closeScheduleModal();
+    showDatabases(currentPanelId, document.getElementById('dbListPanelName').textContent);
+});
+</script>
+{% endblock %}
