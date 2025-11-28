@@ -113,12 +113,17 @@ def logout():
 @login_required
 def dashboard():
     databases = DatabaseConfig.query.all()
+    bt_databases = BtDatabaseConfig.query.all()
     recent_backups = BackupHistory.query.order_by(BackupHistory.created_at.desc()).limit(10).all()
     jobs = get_scheduled_jobs()
     
+    # 统计直连数据库 + 宝塔数据库
+    total_db = len(databases) + len(bt_databases)
+    enabled_db = sum(1 for d in databases if d.enabled) + sum(1 for d in bt_databases if d.enabled)
+    
     stats = {
-        'total_databases': len(databases),
-        'enabled_databases': sum(1 for d in databases if d.enabled),
+        'total_databases': total_db,
+        'enabled_databases': enabled_db,
         'total_backups': BackupHistory.query.count(),
         'successful_backups': BackupHistory.query.filter_by(status='success').count(),
         'failed_backups': BackupHistory.query.filter_by(status='failed').count(),
@@ -126,6 +131,7 @@ def dashboard():
     
     return render_template('dashboard.html', 
                          databases=databases, 
+                         bt_databases=bt_databases,
                          recent_backups=recent_backups,
                          scheduled_jobs=jobs,
                          stats=stats)
