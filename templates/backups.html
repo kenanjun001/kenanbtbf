@@ -46,13 +46,6 @@
                     <td class="px-6 py-4 text-gray-600 text-sm">{{ backup.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                     <td class="px-6 py-4">
                         <div class="flex space-x-2">
-                            {% if backup.status == 'success' %}
-                            <a href="/api/backup/{{ backup.id }}/download" class="text-primary hover:underline text-sm">下载</a>
-                            {% if not backup.tg_uploaded %}
-                            <button onclick="uploadToTg({{ backup.id }})" class="text-blue-500 hover:underline text-sm">上传TG</button>
-                            {% endif %}
-                            <button onclick="restoreBackup({{ backup.id }})" class="text-yellow-600 hover:underline text-sm">恢复</button>
-                            {% endif %}
                             <button onclick="deleteBackup({{ backup.id }})" class="text-red-500 hover:underline text-sm">删除</button>
                         </div>
                     </td>
