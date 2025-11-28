@@ -676,6 +676,20 @@ def api_bt_backup(id):
                                     'id': cron_id
                                 })
                                 log(f'Delete crontab result: {del_result}')
+                                
+                                # 保存备份记录
+                                backup_record = BackupHistory(
+                                    database_id=None,
+                                    filename=local_filename,
+                                    file_size=0,
+                                    file_hash='',
+                                    status='success',
+                                    duration=0,
+                                    tg_uploaded=True
+                                )
+                                db.session.add(backup_record)
+                                db.session.commit()
+                                log(f'Backup record saved: {local_filename}')
                     else:
                         log(f'Telegram not configured', 'warning')
                 
@@ -901,6 +915,20 @@ def bt_backup_job(config_id: int):
                                     'id': cron_id
                                 })
                                 log(f'[Scheduled] Delete crontab result: {del_result}')
+                                
+                                # 保存备份记录
+                                backup_record = BackupHistory(
+                                    database_id=None,
+                                    filename=local_filename,
+                                    file_size=0,
+                                    file_hash='',
+                                    status='success',
+                                    duration=0,
+                                    tg_uploaded=True
+                                )
+                                db.session.add(backup_record)
+                                db.session.commit()
+                                log(f'[Scheduled] Backup record saved: {local_filename}')
                     
                     # 删除备份文件
                     delete_result = bt._request('/files?action=DeleteFile', {
