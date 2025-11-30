@@ -699,6 +699,28 @@ def api_bt_backup(id):
                 })
                 log(f'Delete remote result: {delete_result}')
                 
+                # 删除宝塔的数据库备份记录
+                # 先获取备份列表找到对应的记录ID
+                backup_list = bt._request('/database?action=GetBackupList', {
+                    'p': 1,
+                    'limit': 20,
+                    'type': 0,
+                    'tojs': '',
+                    'table': 'backup',
+                    'search': db_name
+                })
+                if backup_list.get('data'):
+                    for bk in backup_list['data']:
+                        bk_filename = bk.get('filename', '')
+                        if local_filename in bk_filename or bk_filename in backup_path:
+                            bk_id = bk.get('id')
+                            if bk_id:
+                                del_bk_result = bt._request('/database?action=DeleteBackup', {
+                                    'id': bk_id
+                                })
+                                log(f'Delete BT backup record result: {del_bk_result}')
+                                break
+                
                 # 清空回收站
                 recycle_result = bt._request('/files?action=Close_Recycle_bin', {
                     'status': 1
@@ -937,6 +959,27 @@ def bt_backup_job(config_id: int):
                         'path': backup_path
                     })
                     log(f'[Scheduled] Delete file result: {delete_result}')
+                    
+                    # 删除宝塔的数据库备份记录
+                    backup_list = bt._request('/database?action=GetBackupList', {
+                        'p': 1,
+                        'limit': 20,
+                        'type': 0,
+                        'tojs': '',
+                        'table': 'backup',
+                        'search': db_name
+                    })
+                    if backup_list.get('data'):
+                        for bk in backup_list['data']:
+                            bk_filename = bk.get('filename', '')
+                            if local_filename in bk_filename or bk_filename in backup_path:
+                                bk_id = bk.get('id')
+                                if bk_id:
+                                    del_bk_result = bt._request('/database?action=DeleteBackup', {
+                                        'id': bk_id
+                                    })
+                                    log(f'[Scheduled] Delete BT backup record result: {del_bk_result}')
+                                    break
                     
                     # 清空回收站
                     recycle_result = bt._request('/files?action=Close_Recycle_bin', {
