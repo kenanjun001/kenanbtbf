@@ -758,9 +758,10 @@ def api_create_bt_database():
         db_name=data['db_name'],
         enabled=data.get('enabled', True),
         schedule_enabled=data.get('schedule_enabled', False),
-        schedule_type=data.get('schedule_type', 'daily'),
+        schedule_type=data.get('schedule_type', 'minutes'),
         schedule_time=data.get('schedule_time', '03:00'),
         schedule_day=data.get('schedule_day', 0),
+        schedule_minutes=data.get('schedule_minutes', 30),
         push_to_tg=data.get('push_to_tg', True)
     )
     
@@ -786,6 +787,7 @@ def api_update_bt_database(id):
     config.schedule_type = data.get('schedule_type', config.schedule_type)
     config.schedule_time = data.get('schedule_time', config.schedule_time)
     config.schedule_day = data.get('schedule_day', config.schedule_day)
+    config.schedule_minutes = data.get('schedule_minutes', config.schedule_minutes)
     config.push_to_tg = data.get('push_to_tg', config.push_to_tg)
     
     db.session.commit()
@@ -964,6 +966,7 @@ def bt_backup_job(config_id: int):
 def update_bt_job(config: BtDatabaseConfig):
     """更新宝塔备份定时任务"""
     from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
     
     job_id = f'bt_backup_{config.id}'
     
@@ -975,14 +978,22 @@ def update_bt_job(config: BtDatabaseConfig):
     if config.enabled and config.schedule_enabled:
         hour, minute = (config.schedule_time or '03:00').split(':')
         
-        if config.schedule_type == 'hourly':
+        if config.schedule_type == 'minutes':
+            # 每N分钟
+            trigger = IntervalTrigger(minutes=config.schedule_minutes or 30)
+            schedule_desc = f'每{config.schedule_minutes}分钟'
+        elif config.schedule_type == 'hourly':
             trigger = CronTrigger(minute=minute)
+            schedule_desc = f'每小时 @ :{minute}'
         elif config.schedule_type == 'daily':
             trigger = CronTrigger(hour=hour, minute=minute)
+            schedule_desc = f'每天 @ {config.schedule_time}'
         elif config.schedule_type == 'weekly':
             trigger = CronTrigger(day_of_week=config.schedule_day, hour=hour, minute=minute)
+            schedule_desc = f'每周 @ {config.schedule_time}'
         else:
-            trigger = CronTrigger(hour=hour, minute=minute)
+            trigger = IntervalTrigger(minutes=30)
+            schedule_desc = '每30分钟'
         
         scheduler.add_job(
             bt_backup_job,
@@ -992,7 +1003,7 @@ def update_bt_job(config: BtDatabaseConfig):
             name=f'BT Backup: {config.db_name}',
             replace_existing=True
         )
-        log(f'Scheduled BT backup for {config.db_name}: {config.schedule_type} @ {config.schedule_time}')
+        log(f'Scheduled BT backup for {config.db_name}: {schedule_desc}')
 
 
 def remove_bt_job(config_id: int):

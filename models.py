@@ -175,9 +175,10 @@ class BtDatabaseConfig(db.Model):
     
     # 定时设置
     schedule_enabled = db.Column(db.Boolean, default=False)
-    schedule_type = db.Column(db.String(20), default='daily')  # hourly, daily, weekly
+    schedule_type = db.Column(db.String(20), default='minutes')  # minutes, hourly, daily, weekly
     schedule_time = db.Column(db.String(10), default='03:00')
     schedule_day = db.Column(db.Integer, default=0)  # 0=Monday for weekly
+    schedule_minutes = db.Column(db.Integer, default=30)  # 每N分钟
     
     # 是否推送文件到TG
     push_to_tg = db.Column(db.Boolean, default=True)
@@ -196,5 +197,6 @@ class BtDatabaseConfig(db.Model):
             'schedule_type': self.schedule_type,
             'schedule_time': self.schedule_time,
             'schedule_day': self.schedule_day,
+            'schedule_minutes': self.schedule_minutes,
             'push_to_tg': self.push_to_tg
         }
